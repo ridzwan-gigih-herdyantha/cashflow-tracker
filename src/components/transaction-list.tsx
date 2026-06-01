@@ -11,16 +11,22 @@ import type { Transaction } from "@/lib/types";
 interface Props {
   transactions: Transaction[];
   onDelete: (id: string) => void;
+  onEdit: (tx: Transaction) => void;
+  emptyHint?: string;
 }
 
-export function TransactionList({ transactions, onDelete }: Props) {
+export function TransactionList({
+  transactions,
+  onDelete,
+  onEdit,
+  emptyHint,
+}: Props) {
   if (transactions.length === 0) {
     return (
       <Card className="p-8 text-center">
-        <p className="text-sm text-muted-foreground">
-          Belum ada transaksi bulan ini.
-          <br />
-          Tekan tombol + untuk menambah.
+        <p className="text-sm text-muted-foreground whitespace-pre-line">
+          {emptyHint ??
+            "Belum ada transaksi bulan ini.\nTekan tombol + untuk menambah."}
         </p>
       </Card>
     );
@@ -41,7 +47,19 @@ export function TransactionList({ transactions, onDelete }: Props) {
               const Icon = getIcon(category?.icon ?? "Coins");
               const isIncome = tx.type === "income";
               return (
-                <div key={tx.id} className="flex items-center gap-3 p-3">
+                <div
+                  key={tx.id}
+                  className="flex items-center gap-3 p-3 transition-colors hover:bg-muted/40 cursor-pointer"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => onEdit(tx)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      onEdit(tx);
+                    }
+                  }}
+                >
                   <div
                     className={`flex size-10 shrink-0 items-center justify-center rounded-full bg-muted ${category?.color ?? ""}`}
                   >
@@ -52,7 +70,9 @@ export function TransactionList({ transactions, onDelete }: Props) {
                       {category?.label ?? "Lainnya"}
                     </p>
                     {tx.note && (
-                      <p className="text-xs text-muted-foreground truncate">{tx.note}</p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {tx.note}
+                      </p>
                     )}
                   </div>
                   <div className="text-right">
@@ -69,7 +89,10 @@ export function TransactionList({ transactions, onDelete }: Props) {
                     variant="ghost"
                     size="icon"
                     className="size-8 text-muted-foreground hover:text-red-500"
-                    onClick={() => onDelete(tx.id)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDelete(tx.id);
+                    }}
                     aria-label="Hapus transaksi"
                   >
                     <Trash2 className="size-4" />

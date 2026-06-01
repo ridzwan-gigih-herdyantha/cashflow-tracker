@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { v4 as uuid } from "uuid";
 import { toast } from "sonner";
 import { Plus } from "lucide-react";
@@ -26,21 +26,52 @@ import { categoriesByType } from "@/lib/categories";
 import { formatDateInput } from "@/lib/format";
 import type { Transaction, TransactionType } from "@/lib/types";
 
-interface Props {
-  onAdd: (tx: Transaction) => void;
+interface AddProps {
+  mode?: "add";
+  onSubmit: (tx: Transaction) => void;
 }
 
-export function AddTransactionDialog({ onAdd }: Props) {
-  const [open, setOpen] = useState(false);
-  const [type, setType] = useState<TransactionType>("expense");
-  const [categoryId, setCategoryId] = useState("");
-  const [amount, setAmount] = useState("");
-  const [note, setNote] = useState("");
-  const [date, setDate] = useState(formatDateInput(new Date()));
+interface EditProps {
+  mode: "edit";
+  transaction: Transaction;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSubmit: (tx: Transaction) => void;
+}
+
+type Props = AddProps | EditProps;
+
+export function AddTransactionDialog(props: Props) {
+  const isEdit = props.mode === "edit";
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = isEdit ? props.open : internalOpen;
+  const setOpen = isEdit ? props.onOpenChange : setInternalOpen;
+
+  const initial = isEdit ? props.transaction : null;
+
+  const [type, setType] = useState<TransactionType>(initial?.type ?? "expense");
+  const [categoryId, setCategoryId] = useState(initial?.categoryId ?? "");
+  const [amount, setAmount] = useState(
+    initial ? Number(initial.amount).toLocaleString("id-ID") : ""
+  );
+  const [note, setNote] = useState(initial?.note ?? "");
+  const [date, setDate] = useState(initial?.date ?? formatDateInput(new Date()));
+  const [touchedType, setTouchedType] = useState(false);
 
   useEffect(() => {
-    setCategoryId("");
-  }, [type]);
+    if (touchedType) setCategoryId("");
+  }, [type, touchedType]);
+
+  useEffect(() => {
+    if (isEdit && open && initial) {
+      setType(initial.type);
+      setCategoryId(initial.categoryId);
+      setAmount(Number(initial.amount).toLocaleString("id-ID"));
+      setNote(initial.note);
+      setDate(initial.date);
+      setTouchedType(false);
+    }
+  }, [isEdit, open, initial]);
 
   const categories = categoriesByType(type);
 
@@ -50,6 +81,7 @@ export function AddTransactionDialog({ onAdd }: Props) {
     setAmount("");
     setNote("");
     setDate(formatDateInput(new Date()));
+    setTouchedType(false);
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -63,18 +95,33 @@ export function AddTransactionDialog({ onAdd }: Props) {
       toast.error("Pilih kategori dulu");
       return;
     }
-    const tx: Transaction = {
-      id: uuid(),
-      type,
-      categoryId,
-      amount: numericAmount,
-      note: note.trim(),
-      date,
-      createdAt: new Date().toISOString(),
-    };
-    onAdd(tx);
-    toast.success(type === "income" ? "Pemasukan disimpan" : "Pengeluaran disimpan");
-    reset();
+    const tx: Transaction = isEdit
+      ? {
+          ...props.transaction,
+          type,
+          categoryId,
+          amount: numericAmount,
+          note: note.trim(),
+          date,
+        }
+      : {
+          id: uuid(),
+          type,
+          categoryId,
+          amount: numericAmount,
+          note: note.trim(),
+          date,
+          createdAt: new Date().toISOString(),
+        };
+    props.onSubmit(tx);
+    toast.success(
+      isEdit
+        ? "Perubahan tersimpan"
+        : type === "income"
+          ? "Pemasukan disimpan"
+          : "Pengeluaran disimpan"
+    );
+    if (!isEdit) reset();
     setOpen(false);
   }
 
@@ -83,37 +130,45 @@ export function AddTransactionDialog({ onAdd }: Props) {
       open={open}
       onOpenChange={(o) => {
         setOpen(o);
-        if (!o) reset();
+        if (!o && !isEdit) reset();
       }}
     >
-      <DialogTrigger
-        render={
-          <Button
-            size="icon"
-            className="fixed bottom-6 right-6 size-14 rounded-full shadow-lg z-10"
-            aria-label="Tambah transaksi"
-          />
-        }
-      >
-        <Plus className="size-6" />
-      </DialogTrigger>
+      {!isEdit && (
+        <DialogTrigger
+          render={
+            <Button
+              size="icon"
+              className="fixed bottom-6 right-6 size-14 rounded-full shadow-lg z-10"
+              aria-label="Tambah transaksi"
+            />
+          }
+        >
+          <Plus className="size-6" />
+        </DialogTrigger>
+      )}
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Tambah Transaksi</DialogTitle>
+          <DialogTitle>{isEdit ? "Edit Transaksi" : "Tambah Transaksi"}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div className="grid grid-cols-2 gap-2">
             <Button
               type="button"
               variant={type === "expense" ? "default" : "outline"}
-              onClick={() => setType("expense")}
+              onClick={() => {
+                setType("expense");
+                setTouchedType(true);
+              }}
             >
               Pengeluaran
             </Button>
             <Button
               type="button"
               variant={type === "income" ? "default" : "outline"}
-              onClick={() => setType("income")}
+              onClick={() => {
+                setType("income");
+                setTouchedType(true);
+              }}
             >
               Pemasukan
             </Button>
@@ -122,6 +177,7 @@ export function AddTransactionDialog({ onAdd }: Props) {
           <div className="flex flex-col gap-2">
             <Label htmlFor="category">Kategori</Label>
             <Select
+              modal={false}
               value={categoryId || null}
               onValueChange={(v) => setCategoryId((v as string) ?? "")}
             >
@@ -178,7 +234,7 @@ export function AddTransactionDialog({ onAdd }: Props) {
 
           <DialogFooter>
             <Button type="submit" className="w-full">
-              Simpan
+              {isEdit ? "Simpan Perubahan" : "Simpan"}
             </Button>
           </DialogFooter>
         </form>

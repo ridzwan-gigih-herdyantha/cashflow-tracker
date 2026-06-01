@@ -6,6 +6,7 @@ export interface Category {
   type: TransactionType;
   icon: string;
   color: string;
+  swatch: string;
 }
 
 export interface Transaction {
@@ -23,3 +24,5 @@ export interface MonthlySummary {
   expense: number;
   balance: number;
 }
+
+export type Budgets = Record<string, number>;
